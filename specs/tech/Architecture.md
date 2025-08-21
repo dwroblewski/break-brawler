@@ -5,6 +5,7 @@
 ### Input Layer
 Keyboard, Pointer/Touch → InputController → actions (PadPress, RollStart, DropTrigger, etc.)
 Includes GestureEmulator so keyboards can produce rolls/stutters
+iPad optimized: touch-action: none, velocity tracking, multi-touch support
 
 ### Clock & Scheduler
 - BeatClock (BPM, phase)
@@ -12,8 +13,11 @@ Includes GestureEmulator so keyboards can produce rolls/stutters
 - Deterministic for tests
 
 ### Audio Engine
+- Hybrid: Tone.js Transport + raw Web Audio for samples
+- AudioContext with latencyHint: "interactive"
+- Pre-buffered samples for instant playback
 - Sampler (slices, envelopes)
-- FXBus (tape, brake, filter)
+- FXBus (tape, brake, filter) - avoid ConvolverNode on mobile
 - Sidechain (shapes: Light/Classic/Heavy)
 
 ### Game Core
