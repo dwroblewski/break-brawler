@@ -1,13 +1,12 @@
 # QUEUE
 
-→ Implement InputController with keyboard mapping  [CURRENT]
-  Add TouchController with iPad gesture detection
-  Create hybrid audio system (Tone.js Transport + Web Audio)
-  Build basic Sampler with pre-buffered slices
-  Wire up FTUE first tap scenario (with user activation)  
-  Add Hype meter and combo system  
-  Implement Drop window detection  
-  Create End-of-Run screen  
-  Add clip capture and export  
-  Implement Daily Break mode  
-  Add telemetry events
+Implement proper roll mechanics with Tone.js Transport
+Add Drop window detection on beat 4 of phrase
+Implement sidechain compression for drops
+Create End-of-Run screen with timing/flow/taste scores
+Add real Amen/Think break samples
+Implement clip capture and export (Web Audio Recorder)
+Add Daily Break mode with target grooves
+Improve telemetry events and analytics
+Add one-handed mode support
+Implement assist auto-quantization
