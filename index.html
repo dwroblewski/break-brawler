@@ -2,61 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>Break Brawler</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #111;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    #app {
-      text-align: center;
-    }
-    .pad-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 100px);
-      gap: 10px;
-      margin: 20px auto;
-    }
-    .pad {
-      width: 100px;
-      height: 100px;
-      background: #333;
-      border: 2px solid #555;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      transition: all 0.1s;
-    }
-    .pad:active {
-      background: #666;
-      transform: scale(0.95);
-    }
-  </style>
+  <link rel="stylesheet" href="/app/styles/main.css">
 </head>
 <body>
-  <div id="app">
-    <h1>Break Brawler</h1>
-    <div class="pad-grid">
-      <div class="pad" data-pad="1">KICK</div>
-      <div class="pad" data-pad="2">SNARE</div>
-      <div class="pad" data-pad="3">HAT</div>
-      <div class="pad" data-pad="4">GHOST</div>
-      <div class="pad" data-pad="5">CRASH</div>
-      <div class="pad" data-pad="6">RIDE</div>
+  <div id="app" style="display: none;">
+    <!-- Top HUD -->
+    <div class="hud-top">
+      <div class="score-display">
+        <span class="label">SCORE</span>
+        <span id="score">0</span>
+      </div>
+      <div id="combo" class="combo-display" style="display: none;">
+        2x
+      </div>
     </div>
-    <p>Press pads or use keyboard: A S D / J K L</p>
+
+    <!-- Hype Meter -->
+    <div class="hype-container">
+      <div class="hype-label">HYPE</div>
+      <div class="hype-meter">
+        <div id="hype-fill" class="hype-fill"></div>
+      </div>
+      <div class="hype-hint">Press SPACE at 50% to DROP</div>
+    </div>
+
+    <!-- Phrase Beads -->
+    <div class="phrase-beads">
+      <div class="phrase-bead"></div>
+      <div class="phrase-bead"></div>
+      <div class="phrase-bead"></div>
+      <div class="phrase-bead"></div>
+    </div>
+
+    <!-- Pad Grid -->
+    <div class="pad-grid">
+      <div class="pad" data-pad="1">
+        <span class="pad-label">KICK</span>
+        <span class="pad-key">A</span>
+      </div>
+      <div class="pad" data-pad="2">
+        <span class="pad-label">SNARE</span>
+        <span class="pad-key">S</span>
+      </div>
+      <div class="pad" data-pad="3">
+        <span class="pad-label">HAT</span>
+        <span class="pad-key">D</span>
+      </div>
+      <div class="pad" data-pad="4">
+        <span class="pad-label">GHOST</span>
+        <span class="pad-key">J</span>
+      </div>
+      <div class="pad" data-pad="5">
+        <span class="pad-label">CRASH</span>
+        <span class="pad-key">K</span>
+      </div>
+      <div class="pad" data-pad="6">
+        <span class="pad-label">RIDE</span>
+        <span class="pad-key">L</span>
+      </div>
+    </div>
+
+    <!-- Controls hint -->
+    <div class="controls-hint">
+      <span>TAP pads • SWIPE for rolls • HOLD for stutter • SPACE to drop</span>
+    </div>
   </div>
+
   <script type="module" src="/app/src/main.js"></script>
 </body>
 </html>
