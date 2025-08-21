@@ -2,6 +2,7 @@
 import { AudioEngine } from './core/AudioEngine.js';
 import { InputController } from './core/InputController.js';
 import { GameCore } from './core/GameCore.js';
+import { DebugPanel } from './core/DebugPanel.js';
 
 class BreakBrawler {
   constructor() {
@@ -67,6 +68,9 @@ class BreakBrawler {
         this.gameCore.handleAction(action);
       });
       
+      // Create debug panel (hidden by default)
+      this.debugPanel = new DebugPanel(this.gameCore, this.audioEngine);
+      
       this.initialized = true;
       
       // Hide loading, show game
@@ -77,6 +81,7 @@ class BreakBrawler {
       this.animate();
       
       console.log('Break Brawler ready!');
+      console.log('Press Ctrl+D to toggle debug panel');
       
     } catch (error) {
       console.error('Failed to initialize:', error);
