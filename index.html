@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Break Brawler</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    #app {
+      text-align: center;
+    }
+    .pad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 10px;
+      margin: 20px auto;
+    }
+    .pad {
+      width: 100px;
+      height: 100px;
+      background: #333;
+      border: 2px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.1s;
+    }
+    .pad:active {
+      background: #666;
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Break Brawler</h1>
+    <div class="pad-grid">
+      <div class="pad" data-pad="1">KICK</div>
+      <div class="pad" data-pad="2">SNARE</div>
+      <div class="pad" data-pad="3">HAT</div>
+      <div class="pad" data-pad="4">GHOST</div>
+      <div class="pad" data-pad="5">CRASH</div>
+      <div class="pad" data-pad="6">RIDE</div>
+    </div>
+    <p>Press pads or use keyboard: A S D / J K L</p>
+  </div>
+  <script type="module" src="/app/src/main.js"></script>
+</body>
+</html>
