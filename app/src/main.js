@@ -3,12 +3,17 @@ import { AudioEngine } from './core/AudioEngine.js';
 import { InputController } from './core/InputController.js';
 import { GameCore } from './core/GameCore.js';
 import { DebugPanel } from './core/DebugPanel.js';
+import { ClipRecorder } from './core/ClipRecorder.js';
+import { VisualFX } from './core/VisualFX.js';
 
 class BreakBrawler {
   constructor() {
     this.audioEngine = new AudioEngine();
     this.gameCore = null;
     this.inputController = null;
+    this.debugPanel = null;
+    this.clipRecorder = null;
+    this.visualFX = new VisualFX();
     this.initialized = false;
     
     this.setupUI();
@@ -61,7 +66,7 @@ class BreakBrawler {
       await this.audioEngine.initialize();
       
       // Create game core
-      this.gameCore = new GameCore(this.audioEngine);
+      this.gameCore = new GameCore(this.audioEngine, this.visualFX);
       
       // Setup input controller
       this.inputController = new InputController((action) => {
@@ -70,6 +75,15 @@ class BreakBrawler {
       
       // Create debug panel (hidden by default)
       this.debugPanel = new DebugPanel(this.gameCore, this.audioEngine);
+      
+      // Initialize clip recorder
+      this.clipRecorder = new ClipRecorder(this.audioEngine);
+      
+      // Setup pack selector
+      this.setupPackSelector();
+      
+      // Setup clip recording events
+      this.setupClipEvents();
       
       this.initialized = true;
       
@@ -124,6 +138,134 @@ class BreakBrawler {
     error.className = 'error-message';
     error.textContent = message;
     document.body.appendChild(error);
+  }
+  
+  setupPackSelector() {
+    const packSelect = document.getElementById('pack-select');
+    if (!packSelect) return;
+    
+    // Set initial value
+    packSelect.value = this.audioEngine.getCurrentPack();
+    
+    // Handle pack changes
+    packSelect.addEventListener('change', (e) => {
+      const newPack = e.target.value;
+      this.audioEngine.switchPack(newPack);
+      
+      // Visual feedback
+      packSelect.style.borderColor = '#4dabf7';
+      packSelect.style.boxShadow = '0 0 20px rgba(77,171,247,0.6)';
+      
+      setTimeout(() => {
+        packSelect.style.borderColor = '';
+        packSelect.style.boxShadow = '';
+      }, 300);
+    });
+    
+    // Listen for pack change events
+    window.addEventListener('packChanged', (e) => {
+      const { packName, packDisplayName } = e.detail;
+      console.log(`Break pack changed to: ${packDisplayName}`);
+      
+      // Show temporary feedback
+      this.showPackChangeFeedback(packDisplayName);
+    });
+  }
+  
+  showPackChangeFeedback(packName) {
+    const feedback = document.createElement('div');
+    feedback.className = 'pack-change-feedback';
+    feedback.textContent = packName;
+    feedback.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #4dabf7, #69db7c);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      z-index: 1000;
+      animation: pack-change 2s ease-out forwards;
+    `;
+    
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pack-change {
+        0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(feedback);
+    
+    // Remove after animation
+    setTimeout(() => {
+      feedback.remove();
+      style.remove();
+    }, 2000);
+  }
+  
+  setupClipEvents() {
+    // Listen for clip ready events
+    window.addEventListener('clipReady', (e) => {
+      console.log('Clip ready for use:', e.detail);
+    });
+    
+    // Listen for recording started events
+    window.addEventListener('recordingStarted', (e) => {
+      this.showRecordingIndicator();
+    });
+    
+    // Auto-start recording on first hit with hype > 25%
+    let hasStartedRecording = false;
+    this.gameCore.onHypeChange = (hypeLevel) => {
+      if (!hasStartedRecording && hypeLevel > 25 && this.gameCore.hitCount > 5) {
+        hasStartedRecording = true;
+        this.clipRecorder.startRecording();
+      }
+    };
+  }
+  
+  showRecordingIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'recording-indicator';
+    indicator.innerHTML = '🔴 REC';
+    indicator.style.cssText = `
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 1000;
+      animation: pulse 1s infinite;
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(indicator);
+    
+    // Remove after 20 seconds (recording duration)
+    setTimeout(() => {
+      indicator.remove();
+      style.remove();
+    }, 20000);
   }
 
   animatePhraseBeads() {

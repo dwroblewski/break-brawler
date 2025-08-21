@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { BeatClock } from './BeatClock.js';
+import { SampleGenerator } from './SampleGenerator.js';
 
 export class AudioEngine {
   constructor() {
@@ -7,6 +8,11 @@ export class AudioEngine {
     this.audioContext = null;
     this.sampleBuffers = new Map();
     this.activeSources = new Map();
+    
+    // Sample packs
+    this.samplePacks = new Map();
+    this.currentPack = 'amen'; // Default pack
+    this.sampleGenerator = null;
     
     // Timing
     this.bpm = 172;
@@ -42,8 +48,11 @@ export class AudioEngine {
     // Create audio chain: source -> compressor -> masterGain -> destination
     this.setupAudioChain();
     
-    // Create synthetic drum samples (for now)
-    await this.createSyntheticSamples();
+    // Initialize sample generator
+    this.sampleGenerator = new SampleGenerator(this.audioContext);
+    
+    // Load sample packs
+    await this.loadSamplePacks();
     
     // Start the beat clock
     this.beatClock.start();
@@ -70,111 +79,54 @@ export class AudioEngine {
     this.masterGain.connect(this.audioContext.destination);
   }
 
-  async createSyntheticSamples() {
-    // Create simple synthetic drums using Web Audio
-    const sampleRate = this.audioContext.sampleRate;
-    const samples = {
-      KICK: this.generateKick(sampleRate),
-      SNARE: this.generateSnare(sampleRate),
-      HAT: this.generateHat(sampleRate),
-      GHOST: this.generateGhost(sampleRate),
-      CRASH: this.generateCrash(sampleRate),
-      RIDE: this.generateRide(sampleRate)
-    };
+  async loadSamplePacks() {
+    // Generate Amen break pack
+    const amenPack = this.sampleGenerator.generateAmenPack();
+    this.samplePacks.set('amen', amenPack);
     
-    // Convert to audio buffers
-    for (const [name, data] of Object.entries(samples)) {
-      const buffer = this.audioContext.createBuffer(1, data.length, sampleRate);
-      buffer.copyToChannel(data, 0);
+    // Generate Think break pack
+    const thinkPack = this.sampleGenerator.generateThinkPack();
+    this.samplePacks.set('think', thinkPack);
+    
+    // Set initial pack
+    this.switchPack(this.currentPack);
+    
+    console.log('Sample packs loaded: Amen, Think');
+  }
+  
+  switchPack(packName) {
+    const pack = this.samplePacks.get(packName);
+    if (!pack) {
+      console.error(`Sample pack '${packName}' not found`);
+      return;
+    }
+    
+    this.currentPack = packName;
+    
+    // Clear current samples
+    this.sampleBuffers.clear();
+    
+    // Load new pack samples
+    for (const [name, buffer] of Object.entries(pack.samples)) {
       this.sampleBuffers.set(name, buffer);
     }
-  }
-
-  generateKick(sampleRate) {
-    const duration = 0.5;
-    const length = duration * sampleRate;
-    const data = new Float32Array(length);
     
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      // Sine wave with pitch envelope
-      const pitch = 60 * Math.exp(-35 * t);
-      data[i] = Math.sin(2 * Math.PI * pitch * t) * Math.exp(-10 * t);
-      // Add click
-      if (t < 0.005) {
-        data[i] += (Math.random() - 0.5) * Math.exp(-100 * t);
-      }
-    }
-    return data;
-  }
-
-  generateSnare(sampleRate) {
-    const duration = 0.2;
-    const length = duration * sampleRate;
-    const data = new Float32Array(length);
+    console.log(`Switched to ${pack.name} (${packName})`);
     
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      // Mix of tone and noise
-      const tone = Math.sin(2 * Math.PI * 200 * t);
-      const noise = (Math.random() - 0.5);
-      data[i] = (tone * 0.5 + noise) * Math.exp(-30 * t);
-    }
-    return data;
+    // Emit pack change event
+    window.dispatchEvent(new CustomEvent('packChanged', {
+      detail: { packName, packDisplayName: pack.name }
+    }));
+  }
+  
+  getAvailablePacks() {
+    return Array.from(this.samplePacks.keys());
+  }
+  
+  getCurrentPack() {
+    return this.currentPack;
   }
 
-  generateHat(sampleRate) {
-    const duration = 0.05;
-    const length = duration * sampleRate;
-    const data = new Float32Array(length);
-    
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      // High frequency noise
-      data[i] = (Math.random() - 0.5) * Math.exp(-100 * t);
-    }
-    return data;
-  }
-
-  generateGhost(sampleRate) {
-    // Quieter snare
-    const snare = this.generateSnare(sampleRate);
-    return snare.map(s => s * 0.4);
-  }
-
-  generateCrash(sampleRate) {
-    const duration = 2;
-    const length = duration * sampleRate;
-    const data = new Float32Array(length);
-    
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      // Wide spectrum noise
-      let sample = 0;
-      for (let freq = 2000; freq < 10000; freq += 500) {
-        sample += Math.sin(2 * Math.PI * freq * t + Math.random() * Math.PI);
-      }
-      data[i] = sample * 0.1 * Math.exp(-0.5 * t);
-    }
-    return data;
-  }
-
-  generateRide(sampleRate) {
-    const duration = 0.5;
-    const length = duration * sampleRate;
-    const data = new Float32Array(length);
-    
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-      // Bell-like tone
-      let sample = 0;
-      sample += Math.sin(2 * Math.PI * 350 * t);
-      sample += Math.sin(2 * Math.PI * 580 * t) * 0.5;
-      sample += Math.sin(2 * Math.PI * 900 * t) * 0.3;
-      data[i] = sample * 0.3 * Math.exp(-2 * t);
-    }
-    return data;
-  }
 
   playSlice(padId, velocity = 1.0, time = null) {
     if (!this.initialized) return;

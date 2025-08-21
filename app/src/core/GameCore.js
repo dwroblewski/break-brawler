@@ -1,6 +1,7 @@
 export class GameCore {
-  constructor(audioEngine) {
+  constructor(audioEngine, visualFX = null) {
     this.audioEngine = audioEngine;
+    this.visualFX = visualFX;
     
     // Game state
     this.score = 0;
@@ -31,6 +32,9 @@ export class GameCore {
     
     // Telemetry
     this.telemetryEvents = [];
+    
+    // Callbacks
+    this.onHypeChange = null;
     
     // Setup beat clock callbacks
     this.setupBeatCallbacks();
@@ -126,11 +130,43 @@ export class GameCore {
     this.score += baseScore * comboMultiplier;
     
     // Build hype
+    const oldHype = this.hype;
     this.hype = Math.min(this.maxHype, this.hype + 5);
     
-    // Visual feedback
+    // Check if hype is full
+    if (this.hype >= this.maxHype && oldHype < this.maxHype) {
+      this.visualFX?.hypeFullEffect();
+    }
+    
+    // Notify hype change
+    if (this.onHypeChange && this.hype !== oldHype) {
+      this.onHypeChange(this.hype);
+    }
+    
+    // Visual effects
     const timingFeedback = timingError < this.perfectWindow ? 'perfect' : 
                            timingError < this.goodWindow ? 'good' : 'ok';
+    
+    // Add visual feedback for pad hits
+    const pad = document.querySelector(`[data-pad="${padId}"]`);
+    if (this.visualFX && pad) {
+      const intensity = velocity * (timingError < this.perfectWindow ? 1 : 0.7);
+      this.visualFX.hitImpact(pad, intensity);
+      
+      // Perfect hit particles
+      if (timingError < this.perfectWindow) {
+        const rect = pad.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        this.visualFX.perfectHitParticles(centerX, centerY);
+      }
+    }
+    
+    // Combo visual effects
+    if (this.combo > 1 && this.visualFX) {
+      this.visualFX.comboEffect(this.combo);
+    }
+    
     this.showHitFeedback(padId, timingFeedback);
   }
 
@@ -169,6 +205,10 @@ export class GameCore {
         
         // Track timing
         const dropTiming = this.audioEngine.beatClock.isDropWindow ? 'on' : 'late';
+        
+        // Visual drop effect
+        const intensity = this.hype / this.maxHype;
+        this.visualFX?.dropEffect(intensity);
         
         // Reset hype after spending
         const spentHype = this.hype;
@@ -277,6 +317,15 @@ export class GameCore {
           <span>${stats.hitCount} hits in ${stats.duration}s</span>
         </div>
         
+        <div class="clip-section">
+          <h3>Your Clip</h3>
+          <div class="clip-controls">
+            <button id="play-clip">▶ PLAY</button>
+            <button id="download-clip">💾 SAVE</button>
+            <button id="share-clip">🔗 SHARE</button>
+          </div>
+        </div>
+        
         <div class="end-actions">
           <button onclick="location.reload()">PLAY AGAIN</button>
         </div>
@@ -285,10 +334,79 @@ export class GameCore {
     
     document.body.appendChild(overlay);
     
+    // Setup clip controls
+    this.setupClipControls();
+    
     // Animate in
     requestAnimationFrame(() => {
       overlay.style.opacity = '1';
     });
+  }
+  
+  setupClipControls() {
+    // Get the latest clip from the recorder
+    const clipRecorder = window.breakBrawler?.clipRecorder;
+    const clip = clipRecorder?.getLatestClip();
+    
+    if (!clip) {
+      // Disable clip controls if no clip available
+      const clipSection = document.querySelector('.clip-section');
+      if (clipSection) {
+        clipSection.style.opacity = '0.5';
+        clipSection.innerHTML = '<h3>No Clip Recorded</h3><p>Start playing to auto-record a clip!</p>';
+      }
+      return;
+    }
+    
+    // Setup play button
+    const playBtn = document.getElementById('play-clip');
+    if (playBtn) {
+      playBtn.addEventListener('click', () => {
+        this.playClip(clip);
+      });
+    }
+    
+    // Setup download button
+    const downloadBtn = document.getElementById('download-clip');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => {
+        clipRecorder.downloadClip(clip);
+      });
+    }
+    
+    // Setup share button
+    const shareBtn = document.getElementById('share-clip');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        clipRecorder.shareClip(clip);
+      });
+    }
+  }
+  
+  playClip(clip) {
+    // Create audio element to play the clip
+    const audio = new Audio(clip.url);
+    audio.volume = 0.8;
+    
+    const playBtn = document.getElementById('play-clip');
+    if (playBtn) {
+      playBtn.textContent = '⏸ STOP';
+      playBtn.onclick = () => {
+        audio.pause();
+        audio.currentTime = 0;
+        playBtn.textContent = '▶ PLAY';
+        playBtn.onclick = () => this.playClip(clip);
+      };
+    }
+    
+    audio.play().catch(console.error);
+    
+    audio.onended = () => {
+      if (playBtn) {
+        playBtn.textContent = '▶ PLAY';
+        playBtn.onclick = () => this.playClip(clip);
+      }
+    };
   }
 
   showHitFeedback(padId, message) {

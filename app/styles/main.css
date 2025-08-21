@@ -206,11 +206,53 @@ body {
   opacity: 0.6;
 }
 
+/* Sample Pack Selector */
+.pack-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.pack-selector label {
+  font-size: 0.9em;
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+
+.pack-selector select {
+  background: linear-gradient(145deg, #2a2a3e, #16213e);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pack-selector select:hover {
+  border-color: #ffd93d;
+  box-shadow: 0 0 10px rgba(255,217,61,0.3);
+}
+
+.pack-selector select:focus {
+  border-color: #ffd93d;
+  box-shadow: 0 0 15px rgba(255,217,61,0.5);
+}
+
+.pack-selector select option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
 /* Phrase Beads */
 .phrase-beads {
   display: flex;
   gap: 10px;
-  margin: 20px 0;
+  margin: 15px 0;
 }
 
 .phrase-bead {
@@ -358,6 +400,16 @@ body {
   50% { opacity: 0.5; }
 }
 
+@keyframes hype-full {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255,217,61,0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255,217,61,1), 0 0 60px rgba(255,217,61,0.8);
+    transform: scale(1.05);
+  }
+}
+
 /* End of Run Screen */
 #end-of-run {
   position: fixed;
@@ -458,6 +510,56 @@ body {
   margin: 20px 0;
   font-size: 0.9em;
   opacity: 0.7;
+}
+
+/* Clip Section */
+.clip-section {
+  margin: 25px 0;
+  padding: 20px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.clip-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  color: #ffd93d;
+}
+
+.clip-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.clip-controls button {
+  background: linear-gradient(135deg, #4dabf7, #69db7c);
+  border: none;
+  color: white;
+  padding: 10px 15px;
+  font-size: 0.9em;
+  font-weight: bold;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.clip-controls button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(77,171,247,0.4);
+}
+
+.clip-controls button:active {
+  transform: translateY(0);
+}
+
+.clip-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .end-actions {
