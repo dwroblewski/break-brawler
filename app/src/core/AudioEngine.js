@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { BeatClock } from './BeatClock.js';
 
 export class AudioEngine {
   constructor() {
@@ -10,6 +11,15 @@ export class AudioEngine {
     // Timing
     this.bpm = 172;
     this.quantization = 16; // 16th notes
+    this.beatClock = new BeatClock(this.bpm);
+    
+    // Roll state
+    this.activeRolls = new Map();
+    
+    // Sidechain compression
+    this.masterGain = null;
+    this.compressor = null;
+    this.sidechainAmount = 6; // dB (Classic)
     
     // Track first sound for TTF metric
     this.firstSoundTime = null;
@@ -29,11 +39,35 @@ export class AudioEngine {
     Tone.setContext(this.audioContext);
     Tone.Transport.bpm.value = this.bpm;
     
+    // Create audio chain: source -> compressor -> masterGain -> destination
+    this.setupAudioChain();
+    
     // Create synthetic drum samples (for now)
     await this.createSyntheticSamples();
     
+    // Start the beat clock
+    this.beatClock.start();
+    
     this.initialized = true;
     console.log('AudioEngine initialized');
+  }
+  
+  setupAudioChain() {
+    // Create master gain for overall volume control
+    this.masterGain = this.audioContext.createGain();
+    this.masterGain.gain.value = 1.0;
+    
+    // Create compressor for sidechain effect
+    this.compressor = this.audioContext.createDynamicsCompressor();
+    this.compressor.threshold.value = -24;
+    this.compressor.knee.value = 30;
+    this.compressor.ratio.value = 12;
+    this.compressor.attack.value = 0.003;
+    this.compressor.release.value = 0.25;
+    
+    // Connect chain
+    this.compressor.connect(this.masterGain);
+    this.masterGain.connect(this.audioContext.destination);
   }
 
   async createSyntheticSamples() {
@@ -142,7 +176,7 @@ export class AudioEngine {
     return data;
   }
 
-  playSlice(padId, velocity = 1.0) {
+  playSlice(padId, velocity = 1.0, time = null) {
     if (!this.initialized) return;
     
     // Track first sound time
@@ -166,8 +200,10 @@ export class AudioEngine {
     
     if (!buffer) return;
     
-    // Stop previous instance if playing
-    this.stopSlice(padId);
+    // Stop previous instance if playing (only for immediate plays)
+    if (!time) {
+      this.stopSlice(padId);
+    }
     
     // Create and play new source
     const source = this.audioContext.createBufferSource();
@@ -176,15 +212,23 @@ export class AudioEngine {
     source.buffer = buffer;
     gainNode.gain.value = velocity;
     
+    // Connect through our audio chain
     source.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
+    gainNode.connect(this.compressor); // Go through compressor for sidechain
     
-    source.start(0);
-    this.activeSources.set(padId, source);
+    // Schedule or play immediately
+    if (time) {
+      source.start(time);
+    } else {
+      source.start(0);
+      this.activeSources.set(padId, source);
+    }
     
     // Clean up when done
     source.onended = () => {
-      this.activeSources.delete(padId);
+      if (!time) {
+        this.activeSources.delete(padId);
+      }
     };
   }
 
@@ -201,16 +245,87 @@ export class AudioEngine {
   }
 
   startRoll(padId, rate = 16) {
-    // TODO: Implement roll with Tone.js Transport
+    // Stop any existing roll on this pad
+    this.stopRoll(padId);
+    
+    // Calculate interval based on rate (16th, 32nd, 64th notes)
+    const interval = `${rate}n`;
+    
+    // Schedule repeating hits with Transport
+    const rollId = Tone.Transport.scheduleRepeat((time) => {
+      // Play with slightly reduced velocity for rolls
+      this.playSlice(padId, 0.7, time);
+    }, interval);
+    
+    this.activeRolls.set(padId, rollId);
     console.log(`Roll started on pad ${padId} at 1/${rate}`);
   }
 
   stopRoll(padId) {
-    console.log(`Roll stopped on pad ${padId}`);
+    const rollId = this.activeRolls.get(padId);
+    if (rollId !== undefined) {
+      Tone.Transport.clear(rollId);
+      this.activeRolls.delete(padId);
+      console.log(`Roll stopped on pad ${padId}`);
+    }
   }
 
   triggerDrop(hypeLevel) {
-    console.log(`Drop triggered with hype: ${hypeLevel}`);
-    // TODO: Implement drop with sidechain
+    if (!this.beatClock.isDropWindow) {
+      console.log('Drop missed - not in window!');
+      return false;
+    }
+    
+    console.log(`DROP! Hype: ${hypeLevel}, Sidechain: ${this.sidechainAmount}dB`);
+    
+    // Create a sub bass hit for the drop
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    
+    // Sub bass frequency
+    osc.frequency.value = 55; // Low A
+    osc.type = 'sine';
+    
+    // Envelope for punch
+    const now = this.audioContext.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(1, now + 0.01); // Fast attack
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5); // Decay
+    
+    // Connect
+    osc.connect(gain);
+    gain.connect(this.audioContext.destination); // Direct to output for impact
+    
+    // Play
+    osc.start(now);
+    osc.stop(now + 0.5);
+    
+    // Apply sidechain duck to all other audio
+    this.applySidechain();
+    
+    // Play a crash cymbal
+    this.playSlice(5, 1.0);
+    
+    return true;
+  }
+  
+  applySidechain() {
+    const now = this.audioContext.currentTime;
+    const duckAmount = this.sidechainAmount / 20; // Convert dB to linear
+    
+    // Duck the master gain
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+    this.masterGain.gain.linearRampToValueAtTime(1 - duckAmount, now + 0.01); // Fast duck
+    this.masterGain.gain.linearRampToValueAtTime(1, now + 0.3); // Release
+  }
+  
+  setSidechainAmount(type) {
+    const amounts = {
+      'Light': 4,
+      'Classic': 6,
+      'Heavy': 8
+    };
+    this.sidechainAmount = amounts[type] || 6;
   }
 }

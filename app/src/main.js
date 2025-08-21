@@ -122,19 +122,29 @@ class BreakBrawler {
   }
 
   animatePhraseBeads() {
-    const beads = document.querySelectorAll('.phrase-bead');
-    const bpm = this.audioEngine.bpm;
-    const beatDuration = 60000 / bpm; // ms per beat
-    const barDuration = beatDuration * 4; // 4 beats per bar
-    
-    let currentBead = 0;
-    
-    setInterval(() => {
+    // Use the beat clock for accurate timing
+    this.audioEngine.beatClock.onBar = (barNum) => {
+      const beads = document.querySelectorAll('.phrase-bead');
+      const currentBead = barNum % 4; // 4 bars per phrase
+      
       beads.forEach((bead, i) => {
         bead.classList.toggle('active', i === currentBead);
       });
-      currentBead = (currentBead + 1) % beads.length;
-    }, barDuration);
+    };
+    
+    // Also track beats within the bar
+    this.audioEngine.beatClock.onBeat = (beatNum) => {
+      // Visual pulse on beat 1
+      if (beatNum === 0) {
+        const pads = document.querySelectorAll('.pad');
+        pads.forEach(pad => {
+          pad.style.transform = 'scale(1.05)';
+          setTimeout(() => {
+            pad.style.transform = 'scale(1)';
+          }, 100);
+        });
+      }
+    };
   }
 
   animate() {

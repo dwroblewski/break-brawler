@@ -7,6 +7,7 @@ export class GameCore {
     this.combo = 0;
     this.hype = 0;
     this.maxHype = 100;
+    this.isRunning = true;
     
     // Timing state
     this.lastHitTime = 0;
@@ -19,10 +20,41 @@ export class GameCore {
     
     // Session tracking
     this.sessionStartTime = Date.now();
+    this.sessionDuration = 90000; // 90 seconds
     this.hitCount = 0;
+    
+    // Performance metrics for end-of-run
+    this.timingAccuracy = [];
+    this.flowScore = 0;
+    this.tasteScore = 100; // Starts full, decreases with repetition
+    this.patternHistory = [];
     
     // Telemetry
     this.telemetryEvents = [];
+    
+    // Setup beat clock callbacks
+    this.setupBeatCallbacks();
+    
+    // Schedule end of run
+    this.scheduleEndOfRun();
+  }
+  
+  setupBeatCallbacks() {
+    // Update UI on drop window changes
+    this.audioEngine.beatClock.onDropWindow = (isOpen) => {
+      this.updateDropWindowUI(isOpen);
+    };
+    
+    // Track phrase changes
+    this.audioEngine.beatClock.onPhrase = (phraseNum) => {
+      console.log(`Phrase ${phraseNum}`);
+    };
+  }
+  
+  scheduleEndOfRun() {
+    setTimeout(() => {
+      this.endRun();
+    }, this.sessionDuration);
   }
 
   handleAction(action) {
@@ -56,16 +88,36 @@ export class GameCore {
     // Update game state
     this.hitCount++;
     
-    // Calculate timing accuracy (simplified for now)
+    // Calculate timing accuracy
     const now = Date.now();
     const timeSinceLastHit = now - this.lastHitTime;
     this.lastHitTime = now;
     
+    // Track timing accuracy
+    const expectedBeatInterval = 60000 / this.audioEngine.bpm / 4; // 16th note interval
+    const timingError = Math.abs(timeSinceLastHit % expectedBeatInterval);
+    this.timingAccuracy.push(Math.min(timingError, 100));
+    
     // Update combo
     if (timeSinceLastHit < 1000) {
       this.combo++;
+      this.flowScore = Math.min(100, this.flowScore + 2);
     } else {
       this.combo = 1;
+      this.flowScore = Math.max(0, this.flowScore - 5);
+    }
+    
+    // Track patterns for taste scoring
+    this.patternHistory.push(padId);
+    if (this.patternHistory.length > 16) {
+      this.patternHistory.shift();
+      
+      // Check for repetition
+      const recentPattern = this.patternHistory.slice(-4).join(',');
+      const previousPattern = this.patternHistory.slice(-8, -4).join(',');
+      if (recentPattern === previousPattern) {
+        this.tasteScore = Math.max(0, this.tasteScore - 5);
+      }
     }
     
     // Add to score
@@ -77,7 +129,9 @@ export class GameCore {
     this.hype = Math.min(this.maxHype, this.hype + 5);
     
     // Visual feedback
-    this.showHitFeedback(padId, 'perfect');
+    const timingFeedback = timingError < this.perfectWindow ? 'perfect' : 
+                           timingError < this.goodWindow ? 'good' : 'ok';
+    this.showHitFeedback(padId, timingFeedback);
   }
 
   handleRollStart(action) {
@@ -107,24 +161,134 @@ export class GameCore {
 
   handleDrop() {
     if (this.hype >= 50) {
-      this.audioEngine.triggerDrop(this.hype);
+      const success = this.audioEngine.triggerDrop(this.hype);
       
-      // Score bonus
-      this.score += this.hype * 10;
-      
-      // Reset hype after spending
-      this.hype = 0;
-      
-      // Telemetry
-      this.emitTelemetry('drop', { 
-        window: 'on', 
-        hype: this.hype 
-      });
-      
-      this.showHitFeedback('drop', 'DROP!');
+      if (success) {
+        // Score bonus
+        this.score += this.hype * 10;
+        
+        // Track timing
+        const dropTiming = this.audioEngine.beatClock.isDropWindow ? 'on' : 'late';
+        
+        // Reset hype after spending
+        const spentHype = this.hype;
+        this.hype = 0;
+        
+        // Telemetry
+        this.emitTelemetry('drop', { 
+          window: dropTiming, 
+          hype: spentHype 
+        });
+        
+        this.showHitFeedback('drop', 'DROP!');
+      } else {
+        this.showHitFeedback('drop', 'Missed window!');
+      }
     } else {
       this.showHitFeedback('drop', 'Need more hype!');
     }
+  }
+  
+  updateDropWindowUI(isOpen) {
+    const hypeContainer = document.querySelector('.hype-container');
+    if (hypeContainer) {
+      if (isOpen && this.hype >= 50) {
+        hypeContainer.classList.add('drop-ready');
+      } else {
+        hypeContainer.classList.remove('drop-ready');
+      }
+    }
+  }
+  
+  endRun() {
+    if (!this.isRunning) return;
+    this.isRunning = false;
+    
+    // Stop audio
+    this.audioEngine.beatClock.stop();
+    
+    // Calculate final scores
+    const timingScore = this.calculateTimingScore();
+    const flowScore = this.calculateFlowScore();
+    const tasteScore = this.tasteScore;
+    
+    // Show end-of-run screen
+    this.showEndOfRun({
+      score: this.score,
+      timing: timingScore,
+      flow: flowScore,
+      taste: tasteScore,
+      hitCount: this.hitCount,
+      duration: this.sessionDuration / 1000
+    });
+  }
+  
+  calculateTimingScore() {
+    if (this.timingAccuracy.length === 0) return 50;
+    const avg = this.timingAccuracy.reduce((a, b) => a + b, 0) / this.timingAccuracy.length;
+    return Math.max(0, Math.min(100, 100 - avg));
+  }
+  
+  calculateFlowScore() {
+    // Based on combo maintenance
+    return Math.min(100, this.flowScore);
+  }
+  
+  showEndOfRun(stats) {
+    // Create end-of-run overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'end-of-run';
+    overlay.innerHTML = `
+      <div class="end-content">
+        <h2>RUN COMPLETE!</h2>
+        
+        <div class="final-score">
+          <span class="score-label">SCORE</span>
+          <span class="score-value">${stats.score.toLocaleString()}</span>
+        </div>
+        
+        <div class="performance-sliders">
+          <div class="slider-row">
+            <span class="slider-label">TIMING</span>
+            <div class="slider-track">
+              <div class="slider-fill" style="width: ${stats.timing}%"></div>
+            </div>
+            <span class="slider-value">${Math.round(stats.timing)}%</span>
+          </div>
+          
+          <div class="slider-row">
+            <span class="slider-label">FLOW</span>
+            <div class="slider-track">
+              <div class="slider-fill" style="width: ${stats.flow}%"></div>
+            </div>
+            <span class="slider-value">${Math.round(stats.flow)}%</span>
+          </div>
+          
+          <div class="slider-row">
+            <span class="slider-label">TASTE</span>
+            <div class="slider-track">
+              <div class="slider-fill" style="width: ${stats.taste}%"></div>
+            </div>
+            <span class="slider-value">${Math.round(stats.taste)}%</span>
+          </div>
+        </div>
+        
+        <div class="run-stats">
+          <span>${stats.hitCount} hits in ${stats.duration}s</span>
+        </div>
+        
+        <div class="end-actions">
+          <button onclick="location.reload()">PLAY AGAIN</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+    });
   }
 
   showHitFeedback(padId, message) {
